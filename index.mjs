@@ -1,18 +1,37 @@
 import { loadStdlib } from "@reach-sh/stdlib";
 import * as backend from './build/index.main.mjs';
 
-const stdlib = loadStdlib();
+const stdlib = loadStdlib(process.env);
+
 const startingBalance = stdlib.parseCurrency(100);
 
-console.log('Creating test account for Creator');
-const accCreator = await stdlib.newTestAccount(startingBalance);
+console.log('Creating Participant Accounts');
+const [accCreator, accDonor] = await stdlib.newTestAccounts(2, startingBalance);
 
-console.log('Having creator create a testing NFT');
-const theNFT = await stdlib.launchToken(accCreator, "bumple", "NFT", {supply: 1});
+console.log('Launching Contracts');
+const ctcCreator = accCreator.contract(backend);
+const ctcDonor = accDonor.contract(backend, ctcCreator.getInfo());
+
+await promise.All([backend.Creator(ctcCreator, {
+    ...stdlib.hasRandom,
+    //Creator Interact Object Goes Here 
+}),
+backend.Donor(ctcDonor, {
+    ...stdlib.hasRandom,
+    //Donor Interact Object Goes Here 
+})
+]);
+
+console.log('Generating NFT');
+const theNFT = await stdlib.launchToken(accCreator, "Donate2MyArt", "NFT", {supply: 1});
 const nftId = theNFT.id;
-const minBid = stdlib.parseCurrency(2);
+const minPrice = stdlib.parseCurrency(1);
 const lenInBlocks = 10;
-const params = {nftId, minBid, lenInBlocks};
+const params = {nftId, minPrice, lenInBlocks};
+
+await accDonor.tokenAccept(params.nftId); 
+
+
 
 let done = false;
 const bidders = [];
@@ -53,7 +72,7 @@ await ctcCreator.participants.Creator({
     getSale: () => {
         console.log('Creator sets paramets of sale: ', params );
         return params;
-    },
+    },   
     auctionReady: () => {
         startBidders();
     },
@@ -70,7 +89,7 @@ await ctcCreator.participants.Creator({
 
 
 
-for (const [wo, acc] of bidders) {
+for (const [who, acc] of bidders) {
     const [amt, amtNFT] = await stdlib.balancesOf(acc, [null, nftId]);
     console.log(`${who} had ${stdlib.formatCurrency(amt)} ${stdlib.standardUnit} and ${amtNFT}`)
 }
